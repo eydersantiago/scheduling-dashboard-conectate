@@ -1,6 +1,77 @@
-.calendar-container {
+/* ---- layout general ---- */
+.calendar-responsive-wrap {
+  position: relative;
+}
+
+/* Botón flotante para abrir el sidebar (solo móvil) */
+.fc-mobile-toggle {
+  position: fixed;
+  right: 12px;
+  bottom: 16px;
+  z-index: 60;
+  border: 1px solid #d1d5db;
+  background: #111827;
+  color: #fff;
+  border-radius: 9999px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+}
+
+/* Sidebar móvil ocultable */
+.fc-mobile-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100dvh;
+  width: 260px;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+}
+.fc-mobile-sidebar.open {
+  transform: translateX(0);
+}
+
+.fc-mobile-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.fc-close {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fc-mobile-views {
+  display: grid;
+  gap: 10px;
   padding: 12px;
 }
+.fc-mobile-views .view-btn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  text-align: left;
+}
+.fc-mobile-views .view-btn:hover { background: #eef2ff; border-color: #6366f1; }
+.fc-mobile-views .view-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+/* Ajustes de calendario ya existentes */
+.calendar-container { padding: 12px; }
 .loading {
   position: sticky;
   top: 0;
@@ -10,4 +81,20 @@
   border-radius: 8px;
   display: inline-block;
   margin-bottom: 8px;
+}
+
+/* Toolbar nativa más cómoda en pantallas medianas */
+@media (max-width: 1024px) {
+  .fc .fc-toolbar.fc-header-toolbar { flex-wrap: wrap; row-gap: 6px; }
+  .fc-toolbar-title { flex: 1 0 100%; text-align: center; }
+}
+
+/* En móvil: esconder el toggle en desktop y ajustar tipografías */
+@media (min-width: 769px) {
+  .fc-mobile-toggle, .fc-mobile-sidebar { display: none; }
+}
+
+@media (max-width: 768px) {
+  .calendar-container { padding: 8px; }
+  .fc { font-size: 0.92rem; }
 }
