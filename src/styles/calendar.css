@@ -24,7 +24,7 @@
   left: 0;
   top: 0;
   height: 100dvh;
-  width: 260px;
+  width: 280px; /* unificado en 280px */
   transform: translateX(-100%);
   transition: transform 0.25s ease;
   background: #ffffff;
@@ -53,24 +53,45 @@
   cursor: pointer;
 }
 
+/* Vistas del sidebar móvil */
 .fc-mobile-views {
-  display: grid;
-  gap: 10px;
   padding: 12px;
 }
-.fc-mobile-views .view-btn {
+.fc-mobile-views h4,
+.fc-mobile-filter h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+}
+.fc-mobile-views-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.view-btn {
   appearance: none;
   border: 1px solid #d1d5db;
   background: #f9fafb;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 1rem;
-  text-align: left;
+  text-align: center;
 }
-.fc-mobile-views .view-btn:hover { background: #eef2ff; border-color: #6366f1; }
-.fc-mobile-views .view-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+.view-btn:hover { background: #eef2ff; border-color: #6366f1; }
+.view-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
 
-/* Ajustes de calendario ya existentes */
+/* Filtro móvil */
+.fc-mobile-filter {
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  display: grid;
+  gap: 8px;
+}
+.fc-mobile-filter .fc-worker-input,
+.fc-mobile-filter .fc-worker-select {
+  width: 100%;
+}
+
+/* Zona calendario */
 .calendar-container { padding: 12px; }
 .loading {
   position: sticky;
@@ -89,12 +110,37 @@
   .fc-toolbar-title { flex: 1 0 100%; text-align: center; }
 }
 
-/* En móvil: esconder el toggle en desktop y ajustar tipografías */
+/* Ocultar sidebar/toggle en desktop */
 @media (min-width: 769px) {
-  .fc-mobile-toggle, .fc-mobile-sidebar { display: none; }
+  .fc-mobile-toggle,
+  .fc-mobile-sidebar { display: none; }
 }
 
+/* Ajustes móviles */
 @media (max-width: 768px) {
   .calendar-container { padding: 8px; }
   .fc { font-size: 0.92rem; }
+}
+
+/* --------- Controles Desktop (filtro por trabajador) --------- */
+.fc-desktop-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 8px 0 8px; /* unificado */
+}
+.fc-worker-filter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.fc-worker-input,
+.fc-worker-select {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.95rem;
+  min-width: 180px;
 }
