@@ -6,6 +6,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import { fetchGlobalEvents } from "../lib/api";
+import { inferRoleFromName, scheduleTickets } from "../lib/scheduler";
 import "../styles/calendar.css";
 
 type ViewMode = "day" | "week" | "month";
@@ -127,7 +128,12 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
       initialDate: dateISO,
       headerToolbar,
       slotMinTime: "08:00:00",
-      slotMaxTime: "18:30:00",
+      slotMaxTime: "17:30:00",
+      slotDuration: "00:15:00",
+      businessHours: [
+        { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "08:00", endTime: "12:00" },
+        { daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "14:00", endTime: "17:00" },
+      ],
       nowIndicator: true,
       selectable: false,
       weekends: true,
@@ -169,17 +175,33 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
         const end = cal.view.currentEnd.toISOString().slice(0, 10);
         const events = await fetchGlobalEvents(start, end);
 
-        const fcEvents: FCEvent[] = events.map((ev: any) => ({
-          id: String(ev.id),
-          title: ev.title,
-          start: ev.start,
-          end: ev.end,
-          backgroundColor: ev.color || ev.worker?.color_hex || undefined,
-          borderColor: ev.color || ev.worker?.color_hex || undefined,
-          extendedProps: {
-            estado: ev.estado,
+        const scheduledTickets = scheduleTickets(
+          events.map((ev: any, idx: number) => ({
+            id: String(ev.id ?? ev.ticket_external_id ?? idx),
+            title: ev.title,
+            createdAt: ev.created_at ?? ev.start ?? new Date().toISOString(),
+            roleHint: inferRoleFromName(ev.worker?.nombre ?? ev.worker?.name),
             ticket_external_id: ev.ticket_external_id,
-            worker: ev.worker, // puede venir vacío o sin nombre
+            estado: ev.estado,
+            color: ev.color || ev.worker?.color_hex,
+          })),
+        );
+
+        const fcEvents: FCEvent[] = scheduledTickets.map((ticket) => ({
+          id: String(ticket.id),
+          title: `${ticket.title} — ${ticket.worker.firstName}`,
+          start: ticket.start,
+          end: ticket.end,
+          backgroundColor: ticket.color || ticket.worker.color_hex || undefined,
+          borderColor: ticket.color || ticket.worker.color_hex || undefined,
+          extendedProps: {
+            estado: ticket.estado,
+            ticket_external_id: ticket.ticket_external_id,
+            worker: {
+              id: ticket.worker.id,
+              nombre: `${ticket.worker.firstName} ${ticket.worker.lastName}`,
+              color_hex: ticket.worker.color_hex || ticket.color,
+            },
           },
         }));
 
