@@ -256,13 +256,7 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
 
         // 2) Eventos ya programados por el backend → se respetan tal cual
         const alreadyScheduled = visibleEvents.filter(
-          (
-            ev,
-          ): ev is ApiEvent & {
-            start: string;
-            end: string;
-            worker: NonNullable<ApiEvent["worker"]>;
-          } => Boolean(ev.start && ev.end && ev.worker),
+          (ev) => ev.start && ev.end && ev.worker,
         );
 
         const fcEventsFromBackend: FCEvent[] = alreadyScheduled.map(
