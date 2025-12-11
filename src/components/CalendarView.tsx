@@ -259,21 +259,19 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
           (ev) => ev.start && ev.end && ev.worker,
         );
 
-        const fcEventsFromBackend: FCEvent[] = alreadyScheduled.map(
-          (ev) => ({
-            id: String(ev.id ?? ev.ticket_external_id),
-            title: ev.title,
-            start: ev.start,
-            end: ev.end,
-            backgroundColor: ev.color || ev.worker?.color_hex || undefined,
-            borderColor: ev.color || ev.worker?.color_hex || undefined,
-            extendedProps: {
-              estado: ev.estado,
-              ticket_external_id: ev.ticket_external_id,
-              worker: ev.worker, // trabajador real de la BD
-            },
-          }),
-        );
+        const fcEventsFromBackend: FCEvent[] = alreadyScheduled.map((ev) => ({
+          id: String(ev.id ?? ev.ticket_external_id),
+          title: ev.title,
+          start: ev.start!,   // <- "confía, no es undefined"
+          end: ev.end!,       // <-
+          backgroundColor: ev.color || ev.worker?.color_hex || undefined,
+          borderColor: ev.color || ev.worker?.color_hex || undefined,
+          extendedProps: {
+            estado: ev.estado,
+            ticket_external_id: ev.ticket_external_id,
+            worker: ev.worker!, // <- ya filtraste antes
+          },
+        }));
 
         // 3) Tickets “incompletos” → se envían al scheduler
         const toSchedule = visibleEvents.filter(
