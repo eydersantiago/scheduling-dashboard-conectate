@@ -7,6 +7,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
+import type { CalendarEvent } from "../lib/api";
 import { fetchGlobalEvents } from "../lib/api";
 import { inferRoleFromName, scheduleTickets } from "../lib/scheduler";
 import type { Worker } from "../lib/scheduler";
@@ -42,6 +43,22 @@ type FCEvent = {
   };
 };
 
+type ApiEvent = Omit<CalendarEvent, "start" | "end" | "worker"> & {
+  start?: string;
+  end?: string;
+  worker?: {
+    id?: number;
+    nombre?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    color_hex?: string;
+  } | null;
+  creation_date?: string;
+  created_at?: string;
+  color?: string;
+};
+
 // --- Helpers de nombres ---
 
 // Quitar tildes y normalizar a minúsculas
@@ -71,7 +88,7 @@ const getWorkerName = (e: FCEvent): string => {
   return (
     e.extendedProps.worker?.nombre ??
     e.extendedProps.worker?.name ??
-    (e.extendedProps as any).worker_name ??
+    e.extendedProps.worker_name ??
     parseNameFromTitle(e.title) ??
     ""
   )
@@ -150,7 +167,8 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
       selectable: false,
       weekends: true,
       eventClick: (arg: EventClickArg) => {
-        const extId = (arg.event.extendedProps as any)["ticket_external_id"];
+        const extProps = arg.event.extendedProps as FCEvent["extendedProps"];
+        const extId = extProps.ticket_external_id;
         alert(
           `Ticket ${extId}\n${arg.event.title}\n${arg.event.start} - ${arg.event.end}`,
         );
@@ -190,13 +208,24 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
 
         const start = cal.view.currentStart.toISOString().slice(0, 10);
         const end = cal.view.currentEnd.toISOString().slice(0, 10);
-        const events: any[] = await fetchGlobalEvents(start, end);
+        const events = (await fetchGlobalEvents(start, end)) as ApiEvent[];
+
+        // Mostrar solo los eventos con estado visible en calendario
+        const hiddenStates = new Set([
+          "pendiente",
+          "pendiente_reasignar",
+        ]);
+
+        const visibleEvents = events.filter((ev) => {
+          const state = (ev.estado ?? "").toString().toLowerCase();
+          return !hiddenStates.has(state);
+        });
 
         // 1) Construir pool de trabajadores desde la BD (ev.worker)
         const workersMap = new Map<number, Worker>();
 
-        for (const ev of events) {
-          const w: any = ev.worker;
+        for (const ev of visibleEvents) {
+          const w = ev.worker;
           if (!w || !w.id) continue;
           if (workersMap.has(w.id)) continue;
 
@@ -226,12 +255,18 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
         }
 
         // 2) Eventos ya programados por el backend → se respetan tal cual
-        const alreadyScheduled = events.filter(
-          (ev: any) => ev.start && ev.end && ev.worker,
+        const alreadyScheduled = visibleEvents.filter(
+          (
+            ev,
+          ): ev is ApiEvent & {
+            start: string;
+            end: string;
+            worker: NonNullable<ApiEvent["worker"]>;
+          } => Boolean(ev.start && ev.end && ev.worker),
         );
 
         const fcEventsFromBackend: FCEvent[] = alreadyScheduled.map(
-          (ev: any) => ({
+          (ev) => ({
             id: String(ev.id ?? ev.ticket_external_id),
             title: ev.title,
             start: ev.start,
@@ -247,15 +282,15 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
         );
 
         // 3) Tickets “incompletos” → se envían al scheduler
-        const toSchedule = events.filter(
-          (ev: any) => !ev.start || !ev.end, // criterio simple
+        const toSchedule = visibleEvents.filter(
+          (ev) => !ev.start || !ev.end, // criterio simple
         );
 
         let fcEventsFromScheduler: FCEvent[] = [];
 
         if (toSchedule.length > 0 && workersFromApi.length > 0) {
           const scheduledTickets = scheduleTickets(
-            toSchedule.map((ev: any, idx: number) => ({
+            toSchedule.map((ev, idx) => ({
               id: String(ev.id ?? ev.ticket_external_id ?? idx),
               title: ev.title,
               createdAt:
