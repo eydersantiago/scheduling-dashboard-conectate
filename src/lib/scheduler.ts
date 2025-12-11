@@ -1,3 +1,5 @@
+// src/lib/scheduler.ts
+
 export type WorkerRole = "office" | "field";
 
 export interface Worker {
@@ -26,91 +28,19 @@ export interface ScheduledTicket extends TicketToSchedule {
   worker: Worker;
 }
 
-// Declaración de trabajadores con su rol (oficina / campo)
-export const WORKERS: Worker[] = [
-  {
-    id: 1,
-    firstName: "Andrés",
-    lastName: "Córdoba Hoyos",
-    email: "andres2529cordoba@gmail.com",
-    phone: "3182057561",
-    role: "field",
-  },
-  {
-    id: 2,
-    firstName: "Brenda",
-    lastName: "Parra Sanchez",
-    email: "brendaparra04@hotmail.com",
-    phone: "3234130761",
-    role: "office",
-  },
-  {
-    id: 3,
-    firstName: "Edinson",
-    lastName: "Riascos Gomez",
-    email: "redinson816@gmail.com",
-    phone: "3125658993",
-    role: "field",
-  },
-  {
-    id: 4,
-    firstName: "Gerardo",
-    lastName: "Vélez Arias",
-    email: "Gerardovelez@conectate.com.co",
-    phone: "3017697066",
-    role: "office",
-  },
-  {
-    id: 6,
-    firstName: "Jari Alexander",
-    lastName: "Otero",
-    email: "alexanderotero606@gmail.com",
-    phone: "(302)7170444",
-    role: "field",
-  },
-  {
-    id: 7,
-    firstName: "Jorge Eliecer",
-    lastName: "López Posso",
-    email: "Joreli2227@gmail.com",
-    phone: "3177427777",
-    role: "field",
-  },
-  {
-    id: 8,
-    firstName: "Maricela",
-    lastName: "Herrera Cardenas",
-    email: "maricela20152@gmail.com",
-    phone: "3136966516",
-    role: "office",
-  },
-  {
-    id: 9,
-    firstName: "Sharon Daniela",
-    lastName: "Mera Sánchez",
-    email: "sharon27mera@gmail.com",
-    phone: "3001315776",
-    role: "field",
-  },
-  {
-    id: 10,
-    firstName: "Yolfredy",
-    lastName: "Mosquera Botero",
-    email: "yolfredym@gmail.com",
-    phone: "3126571993",
-    role: "field",
-  },
-];
-
+// --- Parámetros de agenda ---
+// 45 minutos de atención + 15 minutos de espera
 const EVENT_DURATION_MINUTES = 45;
 const WAITING_BUFFER_MINUTES = 15;
-const SLOT_TOTAL_MINUTES = EVENT_DURATION_MINUTES + WAITING_BUFFER_MINUTES; // 60 minutos por ticket
+const SLOT_TOTAL_MINUTES = EVENT_DURATION_MINUTES + WAITING_BUFFER_MINUTES; // 60 minutos
 
+// Franja laboral: 8-12 y 14-17 (no se agenda 12-14)
 const WORKING_WINDOWS = [
   { startHour: 8, endHour: 12 },
   { startHour: 14, endHour: 17 },
 ];
 
+// Helpers de fechas
 const pad = (n: number) => String(n).padStart(2, "0");
 
 const toLocalISOString = (d: Date) => {
@@ -120,7 +50,8 @@ const toLocalISOString = (d: Date) => {
   );
 };
 
-const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * 60000);
+const addMinutes = (date: Date, minutes: number) =>
+  new Date(date.getTime() + minutes * 60000);
 
 const sameDayWithTime = (date: Date, hour: number, minute = 0) => {
   const d = new Date(date);
@@ -137,16 +68,16 @@ const getWindowsForDate = (date: Date) => {
 
 const nextWorkingStart = (date: Date): Date => {
   let cursor = new Date(date);
+  // Avanza hasta caer dentro de alguna franja laboral
   for (;;) {
-    const windows = getWindowsForDate(cursor);
-    const [morning, afternoon] = windows;
+    const [morning, afternoon] = getWindowsForDate(cursor);
 
     if (cursor < morning.start) return morning.start;
     if (cursor >= morning.start && cursor < morning.end) return cursor;
     if (cursor >= morning.end && cursor < afternoon.start) return afternoon.start;
     if (cursor >= afternoon.start && cursor < afternoon.end) return cursor;
 
-    // Pasado de las 5pm -> siguiente día a las 8am
+    // Si ya pasó de las 17:00 → siguiente día 8:00
     cursor = addMinutes(sameDayWithTime(cursor, 8), 24 * 60);
   }
 };
@@ -159,19 +90,27 @@ const fitsInCurrentWindow = (start: Date, end: Date) => {
 const overlap = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) =>
   aStart < bEnd && bStart < aEnd;
 
+/**
+ * Regla especial de la mañana:
+ * - Tickets generados hasta las 07:00 → se programan a las 08:00.
+ * - Tickets generados entre 07:01 y 08:00 → se programan a las 09:00.
+ * - Después de las 08:00 → usan su hora real (ajustada a franja laboral).
+ */
 const applyMorningRule = (createdAt: Date) => {
-  const sevenAM = sameDayWithTime(createdAt, 7);
-  const eightAM = sameDayWithTime(createdAt, 8);
-  const nineAM = sameDayWithTime(createdAt, 9);
+  const sevenAM = sameDayWithTime(createdAt, 7, 0);
+  const eightAM = sameDayWithTime(createdAt, 8, 0);
+  const nineAM = sameDayWithTime(createdAt, 9, 0);
 
-  if (createdAt < sevenAM) return eightAM;
+  if (createdAt <= sevenAM) return eightAM;
   if (createdAt <= eightAM) return nineAM;
   return createdAt;
 };
 
-const pickEligibleWorkers = (roleHint?: WorkerRole) => {
-  if (!roleHint) return WORKERS;
-  return WORKERS.filter((w) => w.role === roleHint);
+// --- Selección de trabajadores ---
+
+const pickEligibleWorkers = (roleHint: WorkerRole | undefined, pool: Worker[]) => {
+  if (!roleHint) return pool;
+  return pool.filter((w) => w.role === roleHint);
 };
 
 const earliestAvailableWorker = (
@@ -180,25 +119,56 @@ const earliestAvailableWorker = (
   desiredStart: Date,
 ): { worker: Worker; availableAt: Date } => {
   let chosen: { worker: Worker; availableAt: Date } | null = null;
+
   for (const worker of candidates) {
     const workerAvailable = availability.get(worker.id) ?? desiredStart;
-    const ready = nextWorkingStart(workerAvailable < desiredStart ? desiredStart : workerAvailable);
+    const ready = nextWorkingStart(
+      workerAvailable < desiredStart ? desiredStart : workerAvailable,
+    );
     if (!chosen || ready < chosen.availableAt) {
       chosen = { worker, availableAt: ready };
     }
   }
-  // siempre habrá al menos un candidato
+
+  // asumimos que siempre hay al menos 1 candidato
   return chosen!;
 };
 
+// --- Inferencia de rol a partir del nombre ---
+// Oficina: Brenda, Gerardo, Maricela
 export const inferRoleFromName = (name?: string): WorkerRole | undefined => {
   if (!name) return undefined;
   const normalized = name.trim().toLowerCase();
-  if (["brenda", "gerardo", "maricela"].some((w) => normalized.includes(w))) return "office";
+
+  if (["brenda", "gerardo", "maricela"].some((w) => normalized.includes(w))) {
+    return "office";
+  }
   return "field";
 };
 
-export function scheduleTickets(tickets: TicketToSchedule[]): ScheduledTicket[] {
+/**
+ * Agenda tickets respetando:
+ * - Horario 8-12 y 14-17 (no 12-14).
+ * - Máximo 3 tickets en paralelo.
+ * - Duración 45 min + 15 min de espera (1h por ticket).
+ * - Regla de la mañana (antes de 7 → 8am; 7:01-8 → 9am).
+ *
+ * Requiere que `workers` venga desde la BD.
+ * Si `workers` está vacío, devuelve [] y NO agenda nada.
+ */
+export function scheduleTickets(
+  tickets: TicketToSchedule[],
+  workers: Worker[],
+): ScheduledTicket[] {
+  if (!workers || workers.length === 0) {
+    console.error(
+      "[scheduleTickets] No se recibió lista de trabajadores desde la BD. " +
+        "No se aplicará agendamiento automático.",
+    );
+    return [];
+  }
+
+  // Ordenar por fecha de creación
   const sorted = [...tickets].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
@@ -212,7 +182,8 @@ export function scheduleTickets(tickets: TicketToSchedule[]): ScheduledTicket[] 
 
     while (attempts < 2000) {
       attempts += 1;
-      const candidates = pickEligibleWorkers(ticket.roleHint);
+
+      const candidates = pickEligibleWorkers(ticket.roleHint, workers);
       const { worker, availableAt } = earliestAvailableWorker(
         candidates,
         availability,
@@ -222,7 +193,7 @@ export function scheduleTickets(tickets: TicketToSchedule[]): ScheduledTicket[] 
       const start = availableAt;
       const end = addMinutes(start, SLOT_TOTAL_MINUTES);
 
-      // Validar que el bloque completo cabe en la franja laboral
+      // Validar que el bloque completo cabe en una franja laboral
       if (!fitsInCurrentWindow(start, end)) {
         desiredStart = nextWorkingStart(addMinutes(start, SLOT_TOTAL_MINUTES));
         continue;
@@ -236,7 +207,10 @@ export function scheduleTickets(tickets: TicketToSchedule[]): ScheduledTicket[] 
       if (overlapping.length >= 3) {
         const earliestEnd = overlapping
           .map((ev) => new Date(ev.end).getTime())
-          .reduce((min, current) => Math.min(min, current), Number.POSITIVE_INFINITY);
+          .reduce(
+            (min, current) => Math.min(min, current),
+            Number.POSITIVE_INFINITY,
+          );
         desiredStart = nextWorkingStart(new Date(earliestEnd));
         continue;
       }
