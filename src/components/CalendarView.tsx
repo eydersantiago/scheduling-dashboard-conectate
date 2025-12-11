@@ -169,19 +169,24 @@ const CalendarView: React.FC<Props> = ({ mode, dateISO }) => {
         const end = cal.view.currentEnd.toISOString().slice(0, 10);
         const events = await fetchGlobalEvents(start, end);
 
-        const fcEvents: FCEvent[] = events.map((ev: any) => ({
-          id: String(ev.id),
-          title: ev.title,
-          start: ev.start,
-          end: ev.end,
-          backgroundColor: ev.color || ev.worker?.color_hex || undefined,
-          borderColor: ev.color || ev.worker?.color_hex || undefined,
-          extendedProps: {
-            estado: ev.estado,
-            ticket_external_id: ev.ticket_external_id,
-            worker: ev.worker, // puede venir vacío o sin nombre
-          },
-        }));
+        const fcEvents: FCEvent[] = events
+          // Mostrar solo estados que deben ir al calendario
+          .filter(
+            (ev: any) => !["pendiente", "pendiente_reasignar"].includes(ev.estado)
+          )
+          .map((ev: any) => ({
+            id: String(ev.id),
+            title: ev.title,
+            start: ev.start,
+            end: ev.end,
+            backgroundColor: ev.color || ev.worker?.color_hex || undefined,
+            borderColor: ev.color || ev.worker?.color_hex || undefined,
+            extendedProps: {
+              estado: ev.estado,
+              ticket_external_id: ev.ticket_external_id,
+              worker: ev.worker, // puede venir vacío o sin nombre
+            },
+          }));
 
         setRawEvents(fcEvents);
 
